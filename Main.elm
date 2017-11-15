@@ -153,12 +153,12 @@ view model =
         [ div [ id "left-column" ]
             [ h1 [] [ text "Elmtalk" ]
             , nav []
-                [ div [ class "debug" ]
+                [ topicList model
+                , div [ class "debug" ]
                     [ span [] [ text model.message ]
                     , button [ onClick GetAccessToken ] [ text "ログイン" ]
                     , button [ onClick GetTopics ] [ text "トピックを読み込む" ]
                     ]
-                , topicList model
                 ]
             ]
         , div [ id "right-column" ]
