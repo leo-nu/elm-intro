@@ -1,17 +1,28 @@
-module Main exposing (..)
+module Main exposing (main)
 
+import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 
 
-main : Program Never Model Msg
+main : Program () Model Msg
 main =
-    Html.beginnerProgram
-        { model = { message = "" }
+    Browser.element
+        { init = init
         , update = update
+        , subscriptions = subscriptions
         , view = view
         }
+
+
+
+-- INIT
+
+
+init : () -> ( Model, Cmd Msg )
+init _ =
+    ( { message = "" }, Cmd.none )
 
 
 
@@ -31,14 +42,23 @@ type Msg
     | SayBye
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         SayHello greeted ->
-            { model | message = "こんにちは" ++ greeted }
+            ( { model | message = "こんにちは" ++ greeted }, Cmd.none )
 
         SayBye ->
-            { model | message = "さようなら" }
+            ( { model | message = "さようなら" }, Cmd.none )
+
+
+
+-- SUBSCRIPTIONS
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.none
 
 
 

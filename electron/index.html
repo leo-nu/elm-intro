@@ -6,12 +6,16 @@
   </head>
 
   <body>
-    <!-- This div is where we will insert our UI -->
     <div id="container"></div>
   </body>
 
   <!-- finally we run ports.js to start the elm app -->
-  <script type="text/javascript" src="ports.js"></script>
+  <script type="text/javascript" src="elm.js"></script></script>
+  <script>
+    var app = Elm.Main.init({
+      node: document.getElementById("container")
+    });
+  </script>
   <link rel="stylesheet" href="style.css" />
 
 </html>

@@ -1,5 +1,6 @@
-module Main exposing (..)
+module Main exposing (main)
 
+import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -8,9 +9,9 @@ import Json.Decode as Decode
 import Secrets
 
 
-main : Program Never Model Msg
+main : Program () Model Msg
 main =
-    Html.program
+    Browser.element
         { init = init
         , update = update
         , subscriptions = subscriptions
@@ -22,8 +23,8 @@ main =
 -- INIT
 
 
-init : ( Model, Cmd Msg )
-init =
+init : () -> ( Model, Cmd Msg )
+init _ =
     ( { message = ""
       , accessToken = ""
       , topics = [ { name = "Topic 1", id = 1 }, { name = "Topic 2", id = 2 } ]
@@ -52,22 +53,18 @@ type alias Topic =
 
 
 type Msg
-    = SayHello String
-    | GetAccessToken
+    = GetAccessToken
     | GotAccessToken (Result Http.Error String)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        SayHello greeted ->
-            ( { model | message = "こんにちは" ++ greeted }, Cmd.none )
-
         GetAccessToken ->
             ( { model | message = "getting access token..." }, getAccessToken )
 
         GotAccessToken (Err e) ->
-            ( { model | message = toString e }, Cmd.none )
+            ( { model | message = Debug.toString e }, Cmd.none )
 
         GotAccessToken (Ok token) ->
             ( { model | accessToken = token, message = "got token" }, Cmd.none )
@@ -94,7 +91,6 @@ view model =
             , nav []
                 [ div [ class "debug" ]
                     [ span [] [ text model.message ]
-                    , button [ onClick (SayHello "世界樹") ] [ text "hello" ]
                     , button [ onClick GetAccessToken ] [ text "ログイン" ]
                     ]
                 , div [] (List.map topicListItem model.topics)
@@ -129,13 +125,14 @@ getAccessToken =
                     ++ "&grant_type=client_credentials"
                     ++ "&scope=my,topic.read,topic.post"
                 )
-
-        request =
-            Http.post url body decodeAccessToken
     in
-    Http.send GotAccessToken request
+    Http.post
+        { url = url
+        , body = body
+        , expect = Http.expectJson GotAccessToken accessTokenDecoder
+        }
 
 
-decodeAccessToken : Decode.Decoder String
-decodeAccessToken =
+accessTokenDecoder : Decode.Decoder String
+accessTokenDecoder =
     Decode.field "access_token" Decode.string

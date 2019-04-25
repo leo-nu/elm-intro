@@ -1,5 +1,6 @@
-module Main exposing (..)
+module Main exposing (main)
 
+import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -8,9 +9,9 @@ import Json.Decode as Decode
 import Secrets
 
 
-main : Program Never Model Msg
+main : Program () Model Msg
 main =
-    Html.program
+    Browser.element
         { init = init
         , update = update
         , subscriptions = subscriptions
@@ -22,8 +23,8 @@ main =
 -- INIT
 
 
-init : ( Model, Cmd Msg )
-init =
+init : () -> ( Model, Cmd Msg )
+init _ =
     ( { message = ""
       , accessToken = ""
       , topics = [ { name = "Topic 1", id = 1 }, { name = "Topic 2", id = 2 } ]
@@ -65,7 +66,7 @@ update msg model =
             ( { model | message = "getting access token..." }, getAccessToken )
 
         GotAccessToken (Err e) ->
-            ( { model | message = toString e }, Cmd.none )
+            ( { model | message = Debug.toString e }, Cmd.none )
 
         GotAccessToken (Ok token) ->
             ( { model | accessToken = token, message = "got token" }, Cmd.none )
@@ -74,7 +75,7 @@ update msg model =
             ( { model | message = "getting topics..." }, getTopics model.accessToken )
 
         GotTopics (Err e) ->
-            ( { model | message = toString e }, Cmd.none )
+            ( { model | message = Debug.toString e }, Cmd.none )
 
         GotTopics (Ok topics) ->
             ( { model | topics = topics, message = "got topics" }, Cmd.none )
@@ -135,17 +136,17 @@ getAccessToken =
                     ++ Secrets.clientSecret
                     ++ "&grant_type=client_credentials"
                     ++ "&scope=my,topic.read,topic.post"
-                 -- adjust scope ???
                 )
-
-        request =
-            Http.post url body decodeAccessToken
     in
-    Http.send GotAccessToken request
+    Http.post
+        { url = url
+        , body = body
+        , expect = Http.expectJson GotAccessToken accessTokenDecoder
+        }
 
 
-decodeAccessToken : Decode.Decoder String
-decodeAccessToken =
+accessTokenDecoder : Decode.Decoder String
+accessTokenDecoder =
     Decode.field "access_token" Decode.string
 
 
@@ -157,14 +158,16 @@ getTopics : String -> Cmd Msg
 getTopics accessToken =
     let
         url =
-            "https://typetalk.com/api/v1/topics"
+            "https://typetalk.com/api/v2/topics"
                 ++ "?access_token="
                 ++ accessToken
-
-        request =
-            Http.get url decodeTopics
+                ++ "&spaceKey="
+                ++ Secrets.spaceKey
     in
-    Http.send GotTopics request
+    Http.get
+        { url = url
+        , expect = Http.expectJson GotTopics decodeTopics
+        }
 
 
 decodeTopics : Decode.Decoder (List Topic)

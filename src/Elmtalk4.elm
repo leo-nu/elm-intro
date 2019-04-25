@@ -1,17 +1,19 @@
-module Main exposing (..)
+module Main exposing (main)
 
-import Date
+import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
+import Iso8601
 import Json.Decode as Decode
 import Secrets
+import Time
 
 
-main : Program Never Model Msg
+main : Program () Model Msg
 main =
-    Html.program
+    Browser.element
         { init = init
         , update = update
         , subscriptions = subscriptions
@@ -23,8 +25,8 @@ main =
 -- INIT
 
 
-init : ( Model, Cmd Msg )
-init =
+init : () -> ( Model, Cmd Msg )
+init _ =
     ( { message = ""
       , accessToken = ""
       , topics = []
@@ -78,7 +80,7 @@ update msg model =
             ( { model | message = "getting access token..." }, getAccessToken )
 
         GotAccessToken (Err e) ->
-            ( { model | message = toString e }, Cmd.none )
+            ( { model | message = Debug.toString e }, Cmd.none )
 
         GotAccessToken (Ok token) ->
             { model | accessToken = token, message = "got token" } |> update GetTopics
@@ -87,7 +89,7 @@ update msg model =
             ( { model | message = "getting topics..." }, getTopics model.accessToken )
 
         GotTopics (Err e) ->
-            ( { model | message = toString e }, Cmd.none )
+            ( { model | message = Debug.toString e }, Cmd.none )
 
         GotTopics (Ok topics) ->
             ( { model | topics = topics, message = "got topics" }, Cmd.none )
@@ -96,7 +98,7 @@ update msg model =
             ( { model | message = "getting posts..." }, getPosts model.accessToken topic )
 
         GotPosts (Err e) ->
-            ( { model | message = toString e }, Cmd.none )
+            ( { model | message = Debug.toString e }, Cmd.none )
 
         GotPosts (Ok posts) ->
             ( { model | posts = posts, message = "got posts" }, Cmd.none )
@@ -141,17 +143,17 @@ topicListItem topic =
 
 
 post : Post -> Html Msg
-post post =
+post postData =
     div []
         [ div [ class "avatar" ]
-            [ img [ src post.imageUrl ] []
+            [ img [ src postData.imageUrl ] []
             ]
         , div [ class "message-main" ]
             [ div []
-                [ span [ class "author-name" ] [ text post.author ]
-                , span [ class "message-time" ] [ text (formatDate post.createdAt) ]
+                [ span [ class "author-name" ] [ text postData.author ]
+                , span [ class "message-time" ] [ text (formatDate postData.createdAt) ]
                 ]
-            , div [ class "message-text" ] (newlinesToBr post.message)
+            , div [ class "message-text" ] (newlinesToBr postData.message)
             ]
         , hr [ class "clear msgSep" ] []
         ]
@@ -160,22 +162,25 @@ post post =
 formatDate : String -> String
 formatDate str =
     let
-        date =
-            Date.fromString str
+        parsedDate =
+            Iso8601.toTime str
+
+        jstTimezone =
+            Time.customZone (9 * 60) []
     in
-    case date of
+    case parsedDate of
         Ok date ->
-            toString (Date.year date)
+            String.fromInt (Time.toYear jstTimezone date)
                 ++ "-"
-                ++ toString (Date.month date)
+                ++ Debug.toString (Time.toMonth jstTimezone date)
                 ++ "-"
-                ++ toString (Date.day date)
+                ++ String.fromInt (Time.toDay jstTimezone date)
                 ++ " "
-                ++ toString (Date.hour date)
+                ++ String.fromInt (Time.toHour jstTimezone date)
                 ++ ":"
-                ++ toString (Date.minute date)
+                ++ String.fromInt (Time.toMinute jstTimezone date)
                 ++ ":"
-                ++ toString (Date.second date)
+                ++ String.fromInt (Time.toSecond jstTimezone date)
 
         Err error ->
             str
@@ -183,9 +188,8 @@ formatDate str =
 
 newlinesToBr : String -> List (Html Msg)
 newlinesToBr str =
-    str
-        |> String.lines
-        |> List.map (\str -> text str)
+    String.lines str
+        |> List.map (\s -> text s)
         |> List.intersperse (br [] [])
 
 
@@ -208,17 +212,17 @@ getAccessToken =
                     ++ Secrets.clientSecret
                     ++ "&grant_type=client_credentials"
                     ++ "&scope=my,topic.read,topic.post"
-                 -- adjust scope ???
                 )
-
-        request =
-            Http.post url body decodeAccessToken
     in
-    Http.send GotAccessToken request
+    Http.post
+        { url = url
+        , body = body
+        , expect = Http.expectJson GotAccessToken accessTokenDecoder
+        }
 
 
-decodeAccessToken : Decode.Decoder String
-decodeAccessToken =
+accessTokenDecoder : Decode.Decoder String
+accessTokenDecoder =
     Decode.field "access_token" Decode.string
 
 
@@ -230,14 +234,16 @@ getTopics : String -> Cmd Msg
 getTopics accessToken =
     let
         url =
-            "https://typetalk.com/api/v1/topics"
+            "https://typetalk.com/api/v2/topics"
                 ++ "?access_token="
                 ++ accessToken
-
-        request =
-            Http.get url decodeTopics
+                ++ "&spaceKey="
+                ++ Secrets.spaceKey
     in
-    Http.send GotTopics request
+    Http.get
+        { url = url
+        , expect = Http.expectJson GotTopics decodeTopics
+        }
 
 
 decodeTopics : Decode.Decoder (List Topic)
@@ -261,14 +267,14 @@ getPosts accessToken topic =
     let
         url =
             "https://typetalk.com/api/v1/topics/"
-                ++ toString topic.id
+                ++ String.fromInt topic.id
                 ++ "?access_token="
                 ++ accessToken
-
-        request =
-            Http.get url decodePosts
     in
-    Http.send GotPosts request
+    Http.get
+        { url = url
+        , expect = Http.expectJson GotPosts decodePosts
+        }
 
 
 decodePosts : Decode.Decoder (List Post)
